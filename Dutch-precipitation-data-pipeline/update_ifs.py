@@ -53,12 +53,12 @@ def update():
         if answers is None:
             print("Stopping; nothing was saved. Run again later.")
             return
-        for (_, c), loc in zip(batch.iterrows(), answers):
-            if abs(loc["latitude"] - c.lat) > 0.001 or abs(loc["longitude"] - c.lon) > 0.001:
+        for (_, c), location in zip(batch.iterrows(), answers):
+            if abs(location["latitude"] - c.lat) > 0.001 or abs(location["longitude"] - c.lon) > 0.001:
                 print("WARNING: cell mismatch", int(c.cell_id))
             parts.append(pd.DataFrame({
-                "date": pd.to_datetime(loc["daily"]["time"]),
-                "rain_mm": loc["daily"]["precipitation_sum"],
+                "date": pd.to_datetime(location["daily"]["time"]),
+                "rain_mm": location["daily"]["precipitation_sum"],
                 "cell_id": int(c.cell_id),
             }))
         time.sleep(2)                              # stay well under the per-minute limit
