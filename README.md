@@ -22,7 +22,7 @@ Several data sources and approaches were explored before selecting the final sol
 
 The first step was to prepare a geographical grid covering the Netherlands.
 
-The preparation process is documented in Dutch-precipitation-data-pipeline/Preparations.ipynb.
+The preparation process is documented in [Preparation file](Dutch-precipitation-data-pipeline/Preparations.ipynb).
 
 Open-Meteo does not provide a downloadable list of all its model grid coordinates through the API. Instead, when given geographical coordinates, the API returns data for the nearest available model grid point.
 
@@ -62,6 +62,6 @@ The script follows the same batching approach as the historical ingestion proces
 5. Re-downloads the last few days to account for potential historical revisions.
 6. Combines the new data with the existing dataset, removes duplicates, and saves the updated file.
 
-The incremental ingestion script is available in Dutch-precipitation-data-pipeline/update_ifs.py.
+The incremental ingestion script is available in [update_ifs.py](Dutch-precipitation-data-pipeline/update_ifs.py).
 
 This approach avoids unnecessary historical downloads while keeping the dataset up to date.
