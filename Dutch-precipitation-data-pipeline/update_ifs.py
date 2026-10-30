@@ -1,11 +1,11 @@
 import os, time, requests, pandas as pd
 from datetime import date, timedelta
 
-URL = "https://archive-api.open-meteo.com/v1/archive"
-PARQUET = "nl_rain_ifs.parquet"                   # columns: date, cell_id, rain_mm
+url = "https://archive-api.open-meteo.com/v1/archive"
+rain_data = "nl_rain_ifs.parquet"                   # import all rain data
 
-cells = pd.read_parquet("ifs_cells.parquet")      # lat, lon, cell_id
-BATCH = 10
+cells = pd.read_parquet("ifs_cells.parquet")      # import the cells coordinates
+batch_size = 10
 DELAY_DAYS = 5          # newest day requested = today - 5
 OVERLAP_DAYS = 3        # re-fetch the last 3 saved days (catches revisions)
 
@@ -18,7 +18,7 @@ def fetch_cells(batch, start, end):
         "timezone": "Europe/Amsterdam",
     }
     for attempt in range(5):
-        r = requests.get(URL, params=params, timeout=120)
+        r = requests.get(url, params=params, timeout=120)
         if r.status_code == 429:
             reason = r.json().get("reason", "")
             print("Rate limited:", reason)
@@ -32,9 +32,9 @@ def fetch_cells(batch, start, end):
     return None                                    # still limited: stop the run
 
 def update():
-    old = pd.read_parquet(PARQUET)
+    old = pd.read_parquet(rain_data)
     old["date"] = pd.to_datetime(old["date"])
-    old["cell_id"] = old["cell_id"].astype(int)    # chunk files may have stored floats
+    old["cell_id"] = old["cell_id"].astype(int)    
     if old["cell_id"].nunique() < len(cells):
         print(f"WARNING: file has {old['cell_id'].nunique()} cells, expected {len(cells)}")
 
@@ -47,8 +47,8 @@ def update():
     print(f"Fetching {start} -> {end}")
 
     parts = []
-    for b in range(0, len(cells), BATCH):
-        batch = cells.iloc[b:b + BATCH]
+    for b in range(0, len(cells), batch_size):
+        batch = cells.iloc[b:b + batch_size]
         answers = fetch_cells(batch, start.isoformat(), end.isoformat())
         if answers is None:
             print("Stopping; nothing was saved. Run again later.")
@@ -73,8 +73,8 @@ def update():
     df = (pd.concat([old, new], ignore_index=True)
             .drop_duplicates(["date", "cell_id"], keep="last")   # overlap: new wins
             .sort_values(["date", "cell_id"]).reset_index(drop=True))
-    df.to_parquet(PARQUET + ".tmp")
-    os.replace(PARQUET + ".tmp", PARQUET)          # write is all-or-nothing
+    df.to_parquet(rain_data + ".tmp")
+    os.replace(rain_data + ".tmp", rain_data)          # write is all-or-nothing
     print(f"Saved. Last date: {df['date'].max().date()}, rows: {len(df)}")
 
 if __name__ == "__main__":
