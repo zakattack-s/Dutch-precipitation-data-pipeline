@@ -9,7 +9,7 @@ batch_size = 10
 DELAY_DAYS = 5          # newest day requested = today - 5
 OVERLAP_DAYS = 3        # re-fetch the last 3 saved days (catches revisions)
 
-def fetch_cells(batch, start, end):
+def fetch_cells(batch, start, end, label=""):
     params = {
         "latitude": ",".join(f"{x:.4f}" for x in batch["lat"]),
         "longitude": ",".join(f"{x:.4f}" for x in batch["lon"]),
@@ -18,15 +18,17 @@ def fetch_cells(batch, start, end):
         "timezone": "Europe/Amsterdam",
     }
     for attempt in range(5):
+        t = time.time()
         try:
-            r = requests.get(url, params=params, timeout=(15, 60))
+            r = requests.get(url, params=params, timeout=(15, 30))
         except requests.exceptions.RequestException as e:
-            print(f"Attempt {attempt + 1} failed: {type(e).__name__}")
-            time.sleep(10 * (attempt + 1))
+            print(f"{label} attempt {attempt + 1}: {type(e).__name__} after {time.time() - t:.0f}s", flush=True)
+            time.sleep(5)
             continue
+        print(f"{label} attempt {attempt + 1}: HTTP {r.status_code} in {time.time() - t:.1f}s", flush=True)
         if r.status_code == 429:
             reason = r.json().get("reason", "")
-            print("Rate limited:", reason)
+            print("Rate limited:", reason, flush=True)
             if "daily" in reason.lower():
                 return None                        # out of budget for today
             time.sleep(60)                         # minute/hour limit: wait, retry
@@ -35,7 +37,7 @@ def fetch_cells(batch, start, end):
         data = r.json()
         return [data] if isinstance(data, dict) else data
     return None                                    # still failing: stop the run
-
+    
 def update():
     old = pd.read_parquet(rain_data)
     old["date"] = pd.to_datetime(old["date"])
@@ -54,7 +56,8 @@ def update():
     parts = []
     for b in range(0, len(cells), batch_size):
         batch = cells.iloc[b:b + batch_size]
-        answers = fetch_cells(batch, start.isoformat(), end.isoformat())
+        answers = fetch_cells(batch, start.isoformat(), end.isoformat(),
+                            label=f"batch {b // batch_size + 1}/{-(-len(cells) // batch_size)}")
         if answers is None:
             print("Stopping; nothing was saved. Run again later.")
             raise SystemExit(1)                    # makes the GitHub run show red
