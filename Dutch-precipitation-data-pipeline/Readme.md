@@ -125,13 +125,19 @@ Geographical Grid
         v                      v
 Historical Data         Voronoi Polygons
         |                      |
-        v                      |
-nl_rain_ifs.parquet            |
+        v                      v
+nl_rain_ifs.parquet   ifs_cell_polygons.geojson
         |                      |
         +----------+-----------+
                    |
                    v
-          Initial Map Data
+             build_data.py
+                   |
+                   v
+       docs/data.json + docs/cells.geojson
+                   |
+                   v
+           Interactive Map
 ```
 
 **Recurring pipeline**
