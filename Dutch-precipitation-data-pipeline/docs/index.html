@@ -6,32 +6,60 @@
 <title>Daily rainfall in the Netherlands</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-  :root { --ink:#17283a; --panel:#fbfbf9; --line:#d9dde2; --accent:#2171b5; }
+  :root { --ink:#17283a; --panel:rgba(251,251,249,.94); --line:#d9dde2; --accent:#2171b5; }
   html, body { height:100%; margin:0; font:15px/1.4 system-ui, "Segoe UI", sans-serif; color:var(--ink); }
   #map { position:absolute; inset:0; background:#e9edf0; }
   .panel { position:absolute; z-index:1000; background:var(--panel); border:1px solid var(--line);
-           border-radius:6px; box-shadow:0 2px 10px rgba(0,0,0,.15); }
-  #controls { left:50%; bottom:28px; transform:translateX(-50%); width:min(640px, calc(100% - 24px)); padding:12px 16px; }
+           border-radius:8px; box-shadow:0 2px 12px rgba(0,0,0,.16); backdrop-filter:blur(6px); }
+  #controls { left:50%; bottom:28px; transform:translateX(-50%); width:min(680px, calc(100% - 24px)); padding:12px 16px 14px; }
+  #top { display:flex; align-items:center; justify-content:space-between; gap:8px 16px; flex-wrap:wrap; }
   #date { font-size:26px; font-weight:650; letter-spacing:-.01em; }
-  #row { display:flex; align-items:center; gap:10px; margin-top:6px; }
+  #goto { display:flex; align-items:center; gap:6px; font-size:13px; }
+  input[type=date] { font:inherit; font-size:14px; color:var(--ink); background:#fff; border:1px solid var(--line);
+                     border-radius:4px; padding:3px 6px; }
+  #row { display:flex; align-items:center; gap:10px; margin-top:8px; }
   #slider { flex:1; accent-color:var(--accent); }
-  button { font:inherit; border:1px solid var(--line); background:#fff; border-radius:4px; padding:4px 10px; cursor:pointer; }
-  button:focus-visible, #slider:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  #legend { top:12px; right:12px; padding:8px 12px; width:170px; font-size:13px; }
+  button { font:inherit; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:4px;
+           padding:4px 10px; cursor:pointer; }
+  button:hover { background:#eef3f8; }
+  button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  #legend { top:12px; right:12px; padding:10px 12px; width:176px; font-size:13px; }
+  #legend b { font-weight:650; }
   #bar { height:10px; border-radius:2px; margin:6px 0 2px; border:1px solid var(--line); }
-  #scale { display:flex; justify-content:space-between; }
+  #scale { display:flex; justify-content:space-between; color:#40505f; }
+  .row { display:flex; align-items:center; gap:6px; margin-top:6px; color:#40505f; }
+  .swatch { width:10px; height:10px; border:1px solid var(--line); background:#d0d0d0; }
   #note { position:absolute; z-index:1000; left:8px; bottom:2px; font-size:11px; max-width:60%; color:#444; }
   #note a { color:inherit; }
+
+  /* city labels: dark text with a white halo so they read on any polygon color */
+  .city { background:none; border:none; }
+  .city span { display:inline-block; transform:translate(-4px, -50%); white-space:nowrap;
+               font:600 12px/1 system-ui, "Segoe UI", sans-serif; color:var(--ink);
+               text-shadow:0 0 2px #fff, 0 0 2px #fff, 0 0 4px #fff, 0 0 4px #fff, 0 0 6px #fff; }
+  .city span::before { content:""; display:inline-block; width:6px; height:6px; margin-right:5px;
+                       border-radius:50%; background:var(--ink); border:1px solid #fff; vertical-align:1px; }
+  .city.minor { display:none; }
+  .zoomed .city.minor { display:block; }
+  .leaflet-tooltip { font:600 13px system-ui, sans-serif; color:var(--ink); border-radius:4px; }
 </style>
 </head>
 <body>
 <div id="map"></div>
-<div id="legend" class="panel">Rain per day
+<div id="legend" class="panel"><b>Rain per day</b>
   <div id="bar"></div><div id="scale"><span>0</span><span>25+ mm</span></div>
-  <div><span style="background:#d0d0d0;display:inline-block;width:10px;height:10px;border:1px solid var(--line)"></span> no data</div>
+  <div class="row"><span class="swatch"></span> no data</div>
+  <label class="row"><input type="checkbox" id="bg" checked> Background map</label>
 </div>
 <div id="controls" class="panel">
-  <div id="date">Loading…</div>
+  <div id="top">
+    <div id="date">Loading…</div>
+    <div id="goto">
+      <label for="pick">Go to date</label>
+      <input id="pick" type="date">
+      <button id="latest">Latest</button>
+    </div>
+  </div>
   <div id="row">
     <button id="prev" aria-label="Previous day">‹</button>
     <input id="slider" type="range" min="0" max="0" value="0" aria-label="Date">
@@ -53,25 +81,52 @@ function color(mm) {
 document.getElementById("bar").style.background = "linear-gradient(to right," +
   Array.from({length: 11}, (_, i) => color(MAX * (i / 10) ** 2)).join(",") + ")";
 
-const map = L.map("map", {zoomSnap: 0.25}).setView([52.15, 5.4], 7.5);
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {maxZoom: 12, opacity: 0.55, attribution: ""}).addTo(map);
+// Only the Netherlands: the map can't be panned or zoomed out to the world,
+// and the tile layer never requests tiles outside this box.
+const NL = L.latLngBounds([50.6, 3.1], [53.7, 7.4]);
+const map = L.map("map", {zoomSnap: 0.25, minZoom: 6.5, maxZoom: 11,
+  maxBounds: NL.pad(0.2), maxBoundsViscosity: 1}).setView([52.15, 5.4], 7.5);
+const tiles = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {bounds: NL, maxZoom: 11, opacity: 0.55, updateWhenIdle: true, keepBuffer: 1}).addTo(map);
+document.getElementById("bg").onchange = e => e.target.checked ? tiles.addTo(map) : map.removeLayer(tiles);
+
+// City names live in their own pane, above the polygons; clicks pass through them.
+map.createPane("labels");
+const lp = map.getPane("labels"); lp.style.zIndex = 640; lp.style.pointerEvents = "none";
+const CITIES = [  // name, lat, lon, always visible?
+  ["Amsterdam", 52.3676, 4.9041, 1], ["Rotterdam", 51.9244, 4.4777, 1], ["The Hague", 52.0705, 4.3007, 1],
+  ["Utrecht", 52.0907, 5.1214, 1], ["Eindhoven", 51.4416, 5.4697, 1], ["Groningen", 53.2194, 6.5665, 1],
+  ["Maastricht", 50.8514, 5.6910, 1], ["Zwolle", 52.5168, 6.0830, 0], ["Arnhem", 51.9851, 5.8987, 0],
+  ["Leeuwarden", 53.2012, 5.7999, 0], ["Middelburg", 51.4988, 3.6110, 0], ["Den Helder", 52.9563, 4.7608, 0],
+  ["Enschede", 52.2215, 6.8937, 0], ["Breda", 51.5719, 4.7683, 0], ["Nijmegen", 51.8126, 5.8372, 0],
+  ["Almere", 52.3508, 5.2647, 0]];
+CITIES.forEach(([n, la, lo, major]) => L.marker([la, lo], {pane: "labels", interactive: false, keyboard: false,
+  icon: L.divIcon({className: "city" + (major ? "" : " minor"), html: "<span>" + n + "</span>", iconSize: null})}).addTo(map));
+const zoomClass = () => map.getContainer().classList.toggle("zoomed", map.getZoom() >= 8.5);
+map.on("zoomend", zoomClass); zoomClass();
 
 Promise.all([fetch("data.json").then(r => r.json()), fetch("cells.geojson").then(r => r.json())])
 .then(([D, G]) => {
   const idx = {}; D.ids.forEach((id, i) => idx[id] = i);
-  const slider = document.getElementById("slider"), label = document.getElementById("date");
+  const slider = document.getElementById("slider"), label = document.getElementById("date"),
+        pick = document.getElementById("pick");
   slider.max = D.dates.length - 1; slider.value = slider.max;
+  pick.min = D.dates[0]; pick.max = D.dates[D.dates.length - 1];
 
+  const BASE = {weight: 0.4, color: "#fff"};
   const layer = L.geoJSON(G, {
-    style: () => ({weight: 0.4, color: "#fff", fillOpacity: 0.85, fillColor: "#d0d0d0"}),
-    onEachFeature: (f, l) => l.bindTooltip(
-      () => l._mm < 0 ? "No data" : l._mm.toFixed(1) + " mm", {sticky: true})
+    style: () => ({...BASE, fillOpacity: 0.85, fillColor: "#d0d0d0"}),
+    onEachFeature: (f, l) => {
+      l.bindTooltip(() => l._mm < 0 ? "No data" : l._mm.toFixed(1) + " mm", {sticky: true});
+      l.on({mouseover: () => { l.setStyle({weight: 2, color: "#17283a"}); l.bringToFront(); },
+            mouseout: () => l.setStyle(BASE)});
+    }
   }).addTo(map);
   map.fitBounds(layer.getBounds());
 
   function draw() {
     const d = +slider.value;
+    pick.value = D.dates[d];
     label.textContent = new Date(D.dates[d] + "T12:00").toLocaleDateString("en-GB",
       {weekday: "short", day: "numeric", month: "long", year: "numeric"});
     layer.eachLayer(l => {
@@ -83,6 +138,12 @@ Promise.all([fetch("data.json").then(r => r.json()), fetch("cells.geojson").then
   }
   const step = n => { slider.value = Math.min(+slider.max, Math.max(0, +slider.value + n)); draw(); };
   slider.addEventListener("input", draw);
+  pick.addEventListener("change", () => {          // typed or picked date; out-of-range resets to current
+    const i = D.dates.indexOf(pick.value);
+    if (i >= 0) slider.value = i;
+    draw();
+  });
+  document.getElementById("latest").onclick = () => { slider.value = slider.max; draw(); };
   document.getElementById("prev").onclick = () => step(-1);
   document.getElementById("next").onclick = () => step(1);
   draw();
