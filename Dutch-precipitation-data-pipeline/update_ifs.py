@@ -18,7 +18,12 @@ def fetch_cells(batch, start, end):
         "timezone": "Europe/Amsterdam",
     }
     for attempt in range(5):
-        r = requests.get(url, params=params, timeout=120)
+        try:
+            r = requests.get(url, params=params, timeout=(15, 60))
+        except requests.exceptions.RequestException as e:
+            print(f"Attempt {attempt + 1} failed: {type(e).__name__}")
+            time.sleep(10 * (attempt + 1))
+            continue
         if r.status_code == 429:
             reason = r.json().get("reason", "")
             print("Rate limited:", reason)
@@ -29,12 +34,12 @@ def fetch_cells(batch, start, end):
         r.raise_for_status()
         data = r.json()
         return [data] if isinstance(data, dict) else data
-    return None                                    # still limited: stop the run
+    return None                                    # still failing: stop the run
 
 def update():
     old = pd.read_parquet(rain_data)
     old["date"] = pd.to_datetime(old["date"])
-    old["cell_id"] = old["cell_id"].astype(int)    
+    old["cell_id"] = old["cell_id"].astype(int)
     if old["cell_id"].nunique() < len(cells):
         print(f"WARNING: file has {old['cell_id'].nunique()} cells, expected {len(cells)}")
 
@@ -52,7 +57,7 @@ def update():
         answers = fetch_cells(batch, start.isoformat(), end.isoformat())
         if answers is None:
             print("Stopping; nothing was saved. Run again later.")
-            return
+            raise SystemExit(1)                    # makes the GitHub run show red
         for (_, c), location in zip(batch.iterrows(), answers):
             if abs(location["latitude"] - c.lat) > 0.001 or abs(location["longitude"] - c.lon) > 0.001:
                 print("WARNING: cell mismatch", int(c.cell_id))
