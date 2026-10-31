@@ -27,8 +27,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pandas pyarrow requests
-      - name: Test connection
-        run: curl -sS -m 30 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" "https://archive-api.open-meteo.com/v1/archive?latitude=52.1&longitude=5.1&start_date=2026-10-01&end_date=2026-10-02&daily=precipitation_sum&models=ecmwf_ifs"
       - name: Diagnose Python
         run: |
           python -u - <<'EOF'
@@ -42,22 +40,22 @@ jobs:
           url = "https://archive-api.open-meteo.com/v1/archive"
           tests = {
               "requests, default headers": {},
-              "requests, custom User-Agent": {"User-Agent": "nl-rain-map/1.0 (github.com/YOUR-USERNAME)"},
+              "requests, custom User-Agent": {"User-Agent": "nl-rain-map/1.0"},
               "requests, no compression": {"Accept-Encoding": "identity"},
           }
           for name, h in tests.items():
               t = time.time()
               try:
                   r = requests.get(url, params=p, headers=h, timeout=(15, 40))
-                  print(name, r.status_code, f"{time.time() - t:.1f}s", len(r.content), "bytes")
+                  print(name, r.status_code, f"{time.time() - t:.1f}s", len(r.content), "bytes", flush=True)
               except Exception as e:
-                  print(name, "FAILED", type(e).__name__, f"{time.time() - t:.1f}s")
+                  print(name, "FAILED", type(e).__name__, f"{time.time() - t:.1f}s", flush=True)
           u = requests.Request("GET", url, params=p).prepare().url
           out = subprocess.run(["curl", "-sS", "-m", "40", "-o", "/dev/null",
                                 "-w", "%{http_code} in %{time_total}s", u],
                                capture_output=True, text=True)
           print("curl, exact same URL:", out.stdout, out.stderr[:200])
-          EOF      
+          EOF
       - name: Fetch new days
         run: python -u update_ifs.py
       - name: Rebuild map data
