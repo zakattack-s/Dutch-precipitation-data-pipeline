@@ -6,6 +6,7 @@ rain_data = "nl_rain_ifs.parquet"                   # import all rain data
 
 cells = pd.read_parquet("ifs_cells.parquet")      # import the cells coordinates
 batch_size = 10
+session = requests.Session()
 DELAY_DAYS = 5          # newest day requested = today - 5
 OVERLAP_DAYS = 3        # re-fetch the last 3 saved days (catches revisions)
 
@@ -17,10 +18,10 @@ def fetch_cells(batch, start, end, label=""):
         "daily": "precipitation_sum", "models": "ecmwf_ifs",
         "timezone": "Europe/Amsterdam",
     }
-    for attempt in range(5):
+    for attempt in range(10):
         t = time.time()
         try:
-            r = requests.get(url, params=params, timeout=(15, 30))
+            r = session.get(url, params=params, timeout=(15, 30))
         except requests.exceptions.RequestException as e:
             print(f"{label} attempt {attempt + 1}: {type(e).__name__} after {time.time() - t:.0f}s", flush=True)
             time.sleep(5)
