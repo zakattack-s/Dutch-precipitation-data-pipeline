@@ -38,7 +38,7 @@ Explore the precipitation data through the interactive map:
 
 For a detailed explanation of the pipeline architecture, development process, data preparation, and ingestion logic, see:
 
-[Technical Documentation](./pipeline/README.md)
+[Technical Documentation](Dutch-precipitation-data-pipeline/Readme.md)
 
 ## Project Status
 
