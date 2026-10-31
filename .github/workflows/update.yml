@@ -30,7 +30,7 @@ jobs:
       - name: Test connection
         run: curl -sS -m 30 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" "https://archive-api.open-meteo.com/v1/archive?latitude=52.1&longitude=5.1&start_date=2026-10-01&end_date=2026-10-02&daily=precipitation_sum&models=ecmwf_ifs"
       - name: Fetch new days
-        run: python update_ifs.py
+        run: python -u update_ifs.py
       - name: Rebuild map data
         run: python build_data.py
       - name: Commit changes
