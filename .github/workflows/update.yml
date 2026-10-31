@@ -29,15 +29,35 @@ jobs:
       - run: pip install pandas pyarrow requests
       - name: Test connection
         run: curl -sS -m 30 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" "https://archive-api.open-meteo.com/v1/archive?latitude=52.1&longitude=5.1&start_date=2026-10-01&end_date=2026-10-02&daily=precipitation_sum&models=ecmwf_ifs"
-      - name: Diagnose
+      - name: Diagnose Python
         run: |
-          B="https://archive-api.open-meteo.com/v1/archive?daily=precipitation_sum&models=ecmwf_ifs&timezone=Europe%2FAmsterdam"
-          echo "1 cell, 28 days:"
-          curl -sS -m 90 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" "$B&latitude=52.1265&longitude=5.1381&start_date=2026-09-29&end_date=2026-10-26"
-          echo "10 cells, 28 days:"
-          curl -sS -m 90 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" "$B&latitude=52.1,52.2,52.3,52.4,52.5,52.6,52.7,52.8,52.9,53.0&longitude=5.1,5.2,5.3,5.4,5.5,5.6,5.7,5.8,5.9,6.0&start_date=2026-09-29&end_date=2026-10-26"
-          echo "10 cells, 28 days, IPv4 only:"
-          curl -4 -sS -m 90 -o /dev/null -w "HTTP %{http_code} in %{time_total}s\n" "$B&latitude=52.1,52.2,52.3,52.4,52.5,52.6,52.7,52.8,52.9,53.0&longitude=5.1,5.2,5.3,5.4,5.5,5.6,5.7,5.8,5.9,6.0&start_date=2026-09-29&end_date=2026-10-26"
+          python -u - <<'EOF'
+          import time, subprocess, requests, pandas as pd
+          cells = pd.read_parquet("ifs_cells.parquet").iloc[:10]
+          p = {"latitude": ",".join(f"{x:.4f}" for x in cells["lat"]),
+               "longitude": ",".join(f"{x:.4f}" for x in cells["lon"]),
+               "start_date": "2026-09-29", "end_date": "2026-10-26",
+               "daily": "precipitation_sum", "models": "ecmwf_ifs",
+               "timezone": "Europe/Amsterdam"}
+          url = "https://archive-api.open-meteo.com/v1/archive"
+          tests = {
+              "requests, default headers": {},
+              "requests, custom User-Agent": {"User-Agent": "nl-rain-map/1.0 (github.com/YOUR-USERNAME)"},
+              "requests, no compression": {"Accept-Encoding": "identity"},
+          }
+          for name, h in tests.items():
+              t = time.time()
+              try:
+                  r = requests.get(url, params=p, headers=h, timeout=(15, 40))
+                  print(name, r.status_code, f"{time.time() - t:.1f}s", len(r.content), "bytes")
+              except Exception as e:
+                  print(name, "FAILED", type(e).__name__, f"{time.time() - t:.1f}s")
+          u = requests.Request("GET", url, params=p).prepare().url
+          out = subprocess.run(["curl", "-sS", "-m", "40", "-o", "/dev/null",
+                                "-w", "%{http_code} in %{time_total}s", u],
+                               capture_output=True, text=True)
+          print("curl, exact same URL:", out.stdout, out.stderr[:200])
+          EOF      
       - name: Fetch new days
         run: python -u update_ifs.py
       - name: Rebuild map data
