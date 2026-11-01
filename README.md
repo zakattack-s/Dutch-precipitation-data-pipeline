@@ -32,7 +32,7 @@ AI tools were used as learning support during development and to assist with bui
 
 Explore the precipitation data through the interactive map:
 
-[View Interactive Map]([./docs/index.html]([https://zakattack-s.github.io/Dutch-precipitation-data-pipeline/)](https://zakattack-s.github.io/Dutch-precipitation-data-pipeline/)
+[View Interactive Map]([./docs/index.html]([https://zakattack-s.github.io/Dutch-precipitation-data-pipeline/)](https://zakattack-s.github.io/Dutch-precipitation-data-pipeline/))
 
 ## Technical Documentation
 
