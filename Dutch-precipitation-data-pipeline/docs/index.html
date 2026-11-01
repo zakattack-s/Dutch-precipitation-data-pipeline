@@ -41,7 +41,7 @@
   #scale { display:flex; justify-content:space-between; color:#40505f; }
   .row { display:flex; align-items:center; gap:6px; margin-top:6px; color:#40505f; }
   .swatch { width:10px; height:10px; border:1px solid var(--line); background:#d0d0d0; }
-  #note { position:absolute; z-index:1000; left:8px; bottom:2px; font-size:11px; max-width:60%; color:#444; }
+  #note { margin-top:8px; font-size:11px; line-height:1.3; color:#555; }
   #note a { color:inherit; }
 
   #find summary { cursor:pointer; font-weight:650; list-style:none; }
@@ -53,6 +53,7 @@
     #muniList { max-height:110px; }
     #controls { bottom:22px; padding:10px 12px; }
     #date { font-size:22px; }
+    #note { margin-top:6px; font-size:10px; }
   }
   .water-label { background:none; border:none; }
   .water-label span { display:inline-block; transform:translate(-50%, -50%); white-space:nowrap;
@@ -89,9 +90,9 @@
     <input id="slider" type="range" min="0" max="0" value="0" aria-label="Date">
     <button id="next" aria-label="Next day">›</button>
   </div>
-</div>
-<div id="note">Rain: ECMWF IFS model (~8 km cells) via <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0).
+  <div id="note">Rain: ECMWF IFS model (~8 km cells) via <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0).
   Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. Lakes and rivers: Natural Earth.</div>
+</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 const STOPS = [[247,251,255],[198,219,239],[107,174,214],[33,113,181],[8,48,107]];
