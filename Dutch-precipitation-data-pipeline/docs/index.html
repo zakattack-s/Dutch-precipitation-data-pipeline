@@ -44,6 +44,10 @@
   #note { position:absolute; z-index:1000; left:8px; bottom:2px; font-size:11px; max-width:60%; color:#444; }
   #note a { color:inherit; }
 
+  .water-label { background:none; border:none; }
+  .water-label span { display:inline-block; transform:translate(-50%, -50%); white-space:nowrap;
+                      font:italic 600 12px system-ui, sans-serif; letter-spacing:.08em; color:#1b5e59;
+                      text-shadow:0 0 2px #fff, 0 0 2px #fff, 0 0 4px #fff, 0 0 4px #fff; }
   .leaflet-tooltip { font:600 13px system-ui, sans-serif; color:var(--ink); border-radius:4px; }
 </style>
 </head>
@@ -52,6 +56,7 @@
 <div id="legend" class="panel"><b>Rain per day</b>
   <div id="bar"></div><div id="scale"><span>0</span><span>25+ mm</span></div>
   <div class="row"><span class="swatch"></span> no data</div>
+  <label id="waterBox" class="row" hidden><input type="checkbox" id="waterToggle" checked> Lakes and rivers</label>
   <div id="find" hidden>
     <b>Municipalities</b>
     <input id="muniFilter" type="search" placeholder="Search…" autocomplete="off" aria-label="Search municipalities">
@@ -76,7 +81,7 @@
   </div>
 </div>
 <div id="note">Rain: ECMWF IFS model (~8 km cells) via <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0).
-  Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors.</div>
+  Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. Lakes and rivers: Natural Earth.</div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 const STOPS = [[247,251,255],[198,219,239],[107,174,214],[33,113,181],[8,48,107]];
@@ -96,9 +101,24 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
 
 map.createPane("outline");
 const op = map.getPane("outline"); op.style.zIndex = 620; op.style.pointerEvents = "none";
+map.createPane("water"); map.createPane("waterlabels");        // water sits above the rain cells
+const wp = map.getPane("water"), wl = map.getPane("waterlabels");
+wp.style.zIndex = 450; wl.style.zIndex = 630; wp.style.pointerEvents = wl.style.pointerEvents = "none";
 const optional = u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null);
 const byName = (a, b) => a[0].localeCompare(b[0], "nl");
 
+function setupWater(W) {                           // GeoJSON; properties.kind is "lake" or "river"
+  if (!W) return;
+  document.getElementById("waterBox").hidden = false;
+  const group = L.layerGroup().addTo(map);
+  L.geoJSON(W, {pane: "water", interactive: false, style: f => f.properties.kind === "lake"
+    ? {color: "#1b5e59", weight: 1.2, fillColor: "#5fb3ad", fillOpacity: 0.5}
+    : {color: "#1b5e59", weight: 2, opacity: 0.9}}).addTo(group);
+  [["IJsselmeer", 52.80, 5.40], ["Markermeer", 52.50, 5.25]].forEach(([n, la, lo]) =>
+    L.marker([la, lo], {pane: "waterlabels", interactive: false, keyboard: false,
+      icon: L.divIcon({className: "water-label", html: "<span>" + n + "</span>", iconSize: null})}).addTo(group));
+  document.getElementById("waterToggle").onchange = e => e.target.checked ? group.addTo(map) : map.removeLayer(group);
+}
 function setupMunis(M) {                           // GeoJSON; each feature has properties.name
   if (!M || !M.features.length) return;
   document.getElementById("find").hidden = false;
@@ -129,9 +149,9 @@ function setupMunis(M) {                           // GeoJSON; each feature has 
 }
 
 Promise.all([fetch("data.json").then(r => r.json()), fetch("cells.geojson").then(r => r.json()),
-             optional("municipalities.geojson")])
-.then(([D, G, munis]) => {
-  setupMunis(munis);
+             optional("municipalities.geojson"), optional("water.geojson")])
+.then(([D, G, munis, water]) => {
+  setupMunis(munis); setupWater(water);
   const idx = {}; D.ids.forEach((id, i) => idx[id] = i);
   const slider = document.getElementById("slider"), label = document.getElementById("date"),
         pick = document.getElementById("pick");
