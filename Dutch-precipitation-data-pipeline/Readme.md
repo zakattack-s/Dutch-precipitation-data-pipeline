@@ -18,6 +18,7 @@ The precipitation data comes from the **ECMWF IFS model** (about 8 km grid cells
 | `nl_rain_ifs.parquet` | The full precipitation dataset (`date`, `cell_id`, `rain_mm`) |
 | `update_ifs.py` | Incremental ingestion script |
 | `build_data.py` | Converts the dataset into the files used by the map |
+| `prepare_water.py` | Builds `docs/water.geojson` (main lakes and rivers) from Natural Earth |
 | `prepare_places.py` | Optional: builds the municipality file for the map's picker |
 | `docs/` | The published website: `index.html`, `data.json`, `cells.geojson` |
 | `.github/workflows/update.yml` | The GitHub Actions workflow |
@@ -135,6 +136,7 @@ The interface offers:
 
 - a slider, previous and next buttons, a date picker, and a "Latest" button for choosing the day,
 - a tooltip and an outline highlight when hovering over a cell,
+- lakes and rivers drawn above the rain cells, with labels for the IJsselmeer and Markermeer and an on/off switch, to make it easier to find your way around,
 - a municipality picker: a searchable checklist that highlights one or several municipalities without moving the map, a button to zoom to the selection, and a switch to show all municipal boundaries.
 
 The picker reads `docs/municipalities.geojson`, created by [prepare_places.py](prepare_places.py). If the file is missing, the picker stays hidden and the rest of the map works as normal.
@@ -241,4 +243,4 @@ The initial preparation establishes the data and geographical structure. The rec
 - **Not exactly every ten days.** The schedule runs on fixed days of the month, so the gap varies, and GitHub may start a run a little late.
 - **Data delay.** The newest days shown on the map are about five days behind the present.
 - **Dataset growth.** `data.json` is rewritten on every update and grows with each added day.
-- **Attribution.** Weather data is provided by [Open-Meteo](https://open-meteo.com/) under CC BY 4.0, for non-commercial use. Map tiles are © OpenStreetMap contributors. The map footer credits both.
+- **Attribution.** Weather data is provided by [Open-Meteo](https://open-meteo.com/) under CC BY 4.0, for non-commercial use. Map tiles are © OpenStreetMap contributors, and the lakes and rivers come from Natural Earth (public domain) at a coarse scale, so smaller water bodies are missing. The map footer credits both.
