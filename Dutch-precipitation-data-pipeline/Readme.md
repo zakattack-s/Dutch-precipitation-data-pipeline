@@ -18,7 +18,7 @@ The precipitation data comes from the **ECMWF IFS model** (about 8 km grid cells
 | `nl_rain_ifs.parquet` | The full precipitation dataset (`date`, `cell_id`, `rain_mm`) |
 | `update_ifs.py` | Incremental ingestion script |
 | `build_data.py` | Converts the dataset into the files used by the map |
-| `prepare_places.py` | Optional: builds the municipality and city files for the map's dropdowns |
+| `prepare_places.py` | Optional: builds the municipality file for the map's picker |
 | `docs/` | The published website: `index.html`, `data.json`, `cells.geojson` |
 | `.github/workflows/update.yml` | The GitHub Actions workflow |
 
@@ -135,10 +135,9 @@ The interface offers:
 
 - a slider, previous and next buttons, a date picker, and a "Latest" button for choosing the day,
 - a tooltip and an outline highlight when hovering over a cell,
-- city names on a separate map layer above the polygons, so they stay readable,
-- optional dropdowns to jump to a city or a municipality, and a switch to show all municipal boundaries.
+- a municipality picker: a searchable checklist that highlights one or several municipalities without moving the map, a button to zoom to the selection, and a switch to show all municipal boundaries.
 
-The dropdowns read two extra files if they exist (`docs/cities.json` and `docs/municipalities.geojson`), created by [prepare_places.py](prepare_places.py). When the files are missing, the dropdowns stay hidden and the rest of the map works as normal.
+The picker reads `docs/municipalities.geojson`, created by [prepare_places.py](prepare_places.py). If the file is missing, the picker stays hidden and the rest of the map works as normal.
 
 To test the page locally, run `python build_data.py`, then `python -m http.server 8000` inside the `docs` folder, and open `http://localhost:8000`. Opening `index.html` directly does not work, because browsers block loading data files from local paths.
 
