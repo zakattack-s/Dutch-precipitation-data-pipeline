@@ -49,11 +49,6 @@ Open-Meteo API  ->  update_ifs.py  ->  Parquet dataset  ->  build_data.py  ->  J
 | GitHub Actions | Scheduled data updates and deployment |
 | GitHub Pages | Hosting for the interactive map |
 
-## Interactive Map
-
-Explore the precipitation data through the interactive map:
-
-[View Interactive Map](https://zakattack-s.github.io/Dutch-precipitation-data-pipeline/)
 
 ## Technical Documentation
 
