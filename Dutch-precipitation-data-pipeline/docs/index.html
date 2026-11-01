@@ -23,13 +23,19 @@
            padding:4px 10px; cursor:pointer; }
   button:hover { background:#eef3f8; }
   button:focus-visible, input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  #legend { top:12px; right:12px; padding:10px 12px; width:204px; font-size:13px; }
+  #legend { top:12px; right:12px; padding:10px 12px; width:204px; font-size:13px; max-height:calc(100% - 190px); overflow-y:auto; }
   [hidden] { display:none !important; }
   #find { margin-top:10px; padding-top:8px; border-top:1px solid var(--line); }
   #find label { display:block; margin-top:6px; color:#40505f; }
   #find label.row { display:flex; }
-  #find select { display:block; width:100%; margin-top:3px; font:inherit; color:var(--ink); background:#fff;
-                 border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
+  #find input[type=search] { width:100%; box-sizing:border-box; margin-top:6px; font:inherit; color:var(--ink);
+                             border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
+  #muniList { margin-top:6px; max-height:180px; overflow-y:auto; border:1px solid var(--line); border-radius:4px;
+              background:#fff; padding:2px 6px; }
+  #muniList label { display:flex; align-items:center; gap:6px; margin:0; padding:2px 0; color:var(--ink); cursor:pointer; }
+  #muniList label.off { display:none; }
+  #find .btns { display:flex; gap:6px; margin-top:6px; }
+  #find .btns button { flex:1; padding:3px 6px; font-size:12px; }
   #legend b { font-weight:650; }
   #bar { height:10px; border-radius:2px; margin:6px 0 2px; border:1px solid var(--line); }
   #scale { display:flex; justify-content:space-between; color:#40505f; }
@@ -38,15 +44,6 @@
   #note { position:absolute; z-index:1000; left:8px; bottom:2px; font-size:11px; max-width:60%; color:#444; }
   #note a { color:inherit; }
 
-  /* city labels: dark text with a white halo so they read on any polygon color */
-  .city { background:none; border:none; }
-  .city span { display:inline-block; transform:translate(-4px, -50%); white-space:nowrap;
-               font:600 12px/1 system-ui, "Segoe UI", sans-serif; color:var(--ink);
-               text-shadow:0 0 2px #fff, 0 0 2px #fff, 0 0 4px #fff, 0 0 4px #fff, 0 0 6px #fff; }
-  .city span::before { content:""; display:inline-block; width:6px; height:6px; margin-right:5px;
-                       border-radius:50%; background:var(--ink); border:1px solid #fff; vertical-align:1px; }
-  .city.minor { display:none; }
-  .zoomed .city.minor { display:block; }
   .leaflet-tooltip { font:600 13px system-ui, sans-serif; color:var(--ink); border-radius:4px; }
 </style>
 </head>
@@ -55,10 +52,12 @@
 <div id="legend" class="panel"><b>Rain per day</b>
   <div id="bar"></div><div id="scale"><span>0</span><span>25+ mm</span></div>
   <div class="row"><span class="swatch"></span> no data</div>
-  <div id="find">
-    <label id="cityBox" hidden>City<select id="citySel"><option value="">Choose a city…</option></select></label>
-    <label id="muniBox" hidden>Municipality<select id="muniSel"><option value="">Choose a municipality…</option></select></label>
-    <label id="linesBox" class="row" hidden><input type="checkbox" id="muniLines"> Show all boundaries</label>
+  <div id="find" hidden>
+    <b>Municipalities</b>
+    <input id="muniFilter" type="search" placeholder="Search…" autocomplete="off" aria-label="Search municipalities">
+    <div id="muniList"></div>
+    <div class="btns"><button id="muniZoom">Zoom to selected</button><button id="muniClear">Clear</button></div>
+    <label class="row"><input type="checkbox" id="muniLines"> Show all boundaries</label>
   </div>
 </div>
 <div id="controls" class="panel">
@@ -95,59 +94,44 @@ const map = L.map("map", {zoomSnap: 0.25}).setView([52.15, 5.4], 7.5);
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
   {maxZoom: 12, opacity: 0.55, attribution: ""}).addTo(map);
 
-// City names live in their own pane, above the polygons; clicks pass through them.
-map.createPane("labels");
-const lp = map.getPane("labels"); lp.style.zIndex = 640; lp.style.pointerEvents = "none";
-const CITIES = [  // name, lat, lon, always visible?
-  ["Amsterdam", 52.3676, 4.9041, 1], ["Rotterdam", 51.9244, 4.4777, 1], ["The Hague", 52.0705, 4.3007, 1],
-  ["Utrecht", 52.0907, 5.1214, 1], ["Eindhoven", 51.4416, 5.4697, 1], ["Groningen", 53.2194, 6.5665, 1],
-  ["Maastricht", 50.8514, 5.6910, 1], ["Zwolle", 52.5168, 6.0830, 0], ["Arnhem", 51.9851, 5.8987, 0],
-  ["Leeuwarden", 53.2012, 5.7999, 0], ["Middelburg", 51.4988, 3.6110, 0], ["Den Helder", 52.9563, 4.7608, 0],
-  ["Enschede", 52.2215, 6.8937, 0], ["Breda", 51.5719, 4.7683, 0], ["Nijmegen", 51.8126, 5.8372, 0],
-  ["Almere", 52.3508, 5.2647, 0]];
-CITIES.forEach(([n, la, lo, major]) => L.marker([la, lo], {pane: "labels", interactive: false, keyboard: false,
-  icon: L.divIcon({className: "city" + (major ? "" : " minor"), html: "<span>" + n + "</span>", iconSize: null})}).addTo(map));
-const zoomClass = () => map.getContainer().classList.toggle("zoomed", map.getZoom() >= 8.5);
-map.on("zoomend", zoomClass); zoomClass();
-
 map.createPane("outline");
 const op = map.getPane("outline"); op.style.zIndex = 620; op.style.pointerEvents = "none";
 const optional = u => fetch(u).then(r => r.ok ? r.json() : null).catch(() => null);
 const byName = (a, b) => a[0].localeCompare(b[0], "nl");
 
-function setupCities(list) {                       // list: [[name, lat, lon], ...]
-  if (!list || !list.length) return;
-  document.getElementById("cityBox").hidden = false;
-  const sel = document.getElementById("citySel"); let ring = null;
-  list.slice().sort(byName).forEach(c => sel.add(new Option(c[0], JSON.stringify([c[1], c[2]]))));
-  sel.onchange = () => {
-    if (ring) { map.removeLayer(ring); ring = null; }
-    if (!sel.value) return;
-    const ll = JSON.parse(sel.value);
-    ring = L.circleMarker(ll, {pane: "outline", radius: 9, color: "#17283a", weight: 3, fill: false}).addTo(map);
-    map.flyTo(ll, 10, {duration: 0.8});
-  };
-}
 function setupMunis(M) {                           // GeoJSON; each feature has properties.name
   if (!M || !M.features.length) return;
-  document.getElementById("muniBox").hidden = false;
-  document.getElementById("linesBox").hidden = false;
-  const sel = document.getElementById("muniSel"); let chosen = null;
+  document.getElementById("find").hidden = false;
+  const list = document.getElementById("muniList"), filter = document.getElementById("muniFilter");
+  const picked = L.featureGroup().addTo(map), layers = {};          // highlighted municipalities
   const lines = L.geoJSON(M, {pane: "outline", style: {fill: false, color: "#17283a", weight: 0.8, opacity: 0.6}});
-  M.features.map((f, i) => [f.properties.name, i]).sort(byName).forEach(([n, i]) => sel.add(new Option(n, i)));
-  sel.onchange = () => {
-    if (chosen) { map.removeLayer(chosen); chosen = null; }
-    if (sel.value === "") return;
-    chosen = L.geoJSON(M.features[+sel.value], {pane: "outline", style: {fill: false, color: "#17283a", weight: 3}}).addTo(map);
-    map.fitBounds(chosen.getBounds(), {maxZoom: 12, padding: [40, 40]});
+  M.features.map((f, i) => [f.properties.name, i]).sort(byName).forEach(([n, i]) => {
+    const lab = document.createElement("label");
+    lab.innerHTML = '<input type="checkbox"> <span></span>';
+    lab.lastChild.textContent = n; lab.dataset.n = n.toLowerCase();
+    lab.firstChild.onchange = e => {
+      if (e.target.checked) {
+        layers[i] = L.geoJSON(M.features[i], {pane: "outline", style: {fill: false, color: "#d9480f", weight: 3}});
+        picked.addLayer(layers[i]);
+      } else { picked.removeLayer(layers[i]); delete layers[i]; }
+    };
+    list.appendChild(lab);
+  });
+  filter.oninput = () => {
+    const q = filter.value.trim().toLowerCase();
+    list.querySelectorAll("label").forEach(l => l.classList.toggle("off", q !== "" && !l.dataset.n.includes(q)));
+  };
+  document.getElementById("muniClear").onclick = () => list.querySelectorAll("input:checked").forEach(c => c.click());
+  document.getElementById("muniZoom").onclick = () => {             // zoom only when asked
+    if (picked.getLayers().length) map.fitBounds(picked.getBounds(), {maxZoom: 12, padding: [40, 40]});
   };
   document.getElementById("muniLines").onchange = e => e.target.checked ? lines.addTo(map) : map.removeLayer(lines);
 }
 
 Promise.all([fetch("data.json").then(r => r.json()), fetch("cells.geojson").then(r => r.json()),
-             optional("cities.json"), optional("municipalities.geojson")])
-.then(([D, G, cities, munis]) => {
-  setupCities(cities); setupMunis(munis);
+             optional("municipalities.geojson")])
+.then(([D, G, munis]) => {
+  setupMunis(munis);
   const idx = {}; D.ids.forEach((id, i) => idx[id] = i);
   const slider = document.getElementById("slider"), label = document.getElementById("date"),
         pick = document.getElementById("pick");
