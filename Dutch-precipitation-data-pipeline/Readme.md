@@ -40,7 +40,7 @@ To work around this limitation, I:
 
 Points over water are snapped to the nearest land cell by the API, which explains most of the duplicates and the few large offsets between a requested point and the cell it returned.
 
-### Choice of model
+### Choice of data source
 
 Three models were tested before choosing ECMWF IFS:
 
@@ -49,6 +49,12 @@ Three models were tested before choosing ECMWF IFS:
 - **ECMWF IFS** (about 8 km) returned complete data that correlated closely with ERA5 (daily correlation 0.85 to 0.95 in the months compared at one location) and was tested back to mid-2017.
 
 Because different models disagree in detail, data from different models is never mixed in the same dataset.
+
+### Alternative considered: KNMI radar data
+
+I also tried the gridded rainfall data from the Dutch weather service (KNMI). It is based on radar measurements adjusted with rain gauge data and has a 1 km grid, so it would have been more detailed than a model, and it comes as ready-made grids, which would have removed the need to discover the grid cells through an API.
+
+I decided not to use it because of how the data is delivered. It is published as large zip files, roughly 285 to 440 MB each, containing about 24 NetCDF files for every day of the year. As far as I could tell, the file for the current year would have to be downloaded again in full for each update. That does not suit an incremental pipeline running on a free GitHub Actions runner, where the Open-Meteo API lets the script request only the few missing days. The KNMI data also lags by about a month and would have needed extra processing, such as working out how the hourly files relate to a daily total and reprojecting the grid, before it could be shown on the map.
 
 ## 2. Historical Data Ingestion
 
