@@ -44,6 +44,16 @@
   #note { position:absolute; z-index:1000; left:8px; bottom:2px; font-size:11px; max-width:60%; color:#444; }
   #note a { color:inherit; }
 
+  #find summary { cursor:pointer; font-weight:650; list-style:none; }
+  #find summary::-webkit-details-marker { display:none; }
+  #find summary::before { content:"▸ "; }
+  #find[open] summary::before { content:"▾ "; }
+  @media (max-width: 600px) {                       /* phones: smaller panels, picker stays folded */
+    #legend { top:8px; right:8px; width:168px; padding:8px 10px; max-height:calc(100% - 170px); }
+    #muniList { max-height:110px; }
+    #controls { bottom:22px; padding:10px 12px; }
+    #date { font-size:22px; }
+  }
   .water-label { background:none; border:none; }
   .water-label span { display:inline-block; transform:translate(-50%, -50%); white-space:nowrap;
                       font:italic 600 12px system-ui, sans-serif; letter-spacing:.08em; color:#1b5e59;
@@ -57,13 +67,13 @@
   <div id="bar"></div><div id="scale"><span>0</span><span>25+ mm</span></div>
   <div class="row"><span class="swatch"></span> no data</div>
   <label id="waterBox" class="row" hidden><input type="checkbox" id="waterToggle" checked> Lakes and rivers</label>
-  <div id="find" hidden>
-    <b>Municipalities</b>
+  <details id="find" hidden>
+    <summary>Municipalities</summary>
     <input id="muniFilter" type="search" placeholder="Search…" autocomplete="off" aria-label="Search municipalities">
     <div id="muniList"></div>
     <div class="btns"><button id="muniZoom">Zoom to selected</button><button id="muniClear">Clear</button></div>
     <label class="row"><input type="checkbox" id="muniLines"> Show all boundaries</label>
-  </div>
+  </details>
 </div>
 <div id="controls" class="panel">
   <div id="top">
@@ -121,7 +131,8 @@ function setupWater(W) {                           // GeoJSON; properties.kind i
 }
 function setupMunis(M) {                           // GeoJSON; each feature has properties.name
   if (!M || !M.features.length) return;
-  document.getElementById("find").hidden = false;
+  const box = document.getElementById("find");
+  box.hidden = false; box.open = matchMedia("(min-width: 700px)").matches;
   const list = document.getElementById("muniList"), filter = document.getElementById("muniFilter");
   const picked = L.featureGroup().addTo(map), layers = {};          // highlighted municipalities
   const lines = L.geoJSON(M, {pane: "outline", style: {fill: false, color: "#17283a", weight: 0.8, opacity: 0.6}});
