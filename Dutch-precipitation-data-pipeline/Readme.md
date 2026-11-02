@@ -145,7 +145,7 @@ To test the page locally, run `python build_data.py`, then `python -m http.serve
 
 ## 7. Automated Pipeline Updates with GitHub Actions
 
-To automate the data ingestion and visualization process, I configured a GitHub Actions workflow, defined in [update.yml](.github/workflows/update.yml).
+To automate the data ingestion and visualization process, I configured a GitHub Actions workflow, defined in [update.yml](/.github/workflows/update.yml).
 
 ### Triggers
 
